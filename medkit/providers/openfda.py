@@ -143,35 +143,41 @@ class OpenFDAProvider(BaseProvider):
         if len(drugs) < 2:
             return []
 
-        # Heuristic keywords for cross-referencing
-        # e.g. Aspirin label mentions "anticoagulants" (Warfarin)
-        drug_synonyms = {
-            "warfarin": ["anticoagulant", "blood thinner", "coumadin", "jantoven"],
-            "aspirin": ["nsaid", "salicylates", "platelet inhibitor"],
-            "metformin": ["biguanide", "antidiabetic"],
-        }
+        # Pre-fetch drug info for all drugs to avoid redundant API calls
+        drug_infos = []
+        for d in drugs:
+            info_list = self.search_sync(d, limit=1)
+            if info_list:
+                drug_infos.append((d, info_list[0]))
+            else:
+                drug_infos.append((d, None))
 
         found = []
         # Check intersections in both directions for robustness
-        for i, drug_a in enumerate(drugs):
-            info_list = self.search_sync(drug_a, limit=1)
-            if not info_list:
+        for i, (drug_a, info_a) in enumerate(drug_infos):
+            if not info_a:
                 continue
 
-            drug_info = info_list[0]
-            label_text = " ".join(drug_info.interactions).lower()
+            label_text = " ".join(info_a.interactions).lower()
 
-            for j, drug_b in enumerate(drugs):
+            for j, (drug_b, info_b) in enumerate(drug_infos):
                 if i == j:
                     continue
 
-                target_keys = [drug_b.lower()] + drug_synonyms.get(drug_b.lower(), [])
+                target_keys = [drug_b.lower()]
+                if info_b:
+                    if info_b.generic_name:
+                        target_keys.append(info_b.generic_name.lower())
+                    if info_b.brand_name:
+                        target_keys.append(info_b.brand_name.lower())
+
+                target_keys = list(set([k for k in target_keys if k and k != "unknown" and len(k) > 2]))
 
                 for key in target_keys:
                     if key in label_text:
                         # Find the specific evidence snippet
                         evidence = "Source: FDA Label. "
-                        for snippet in drug_info.interactions:
+                        for snippet in info_a.interactions:
                             if key in snippet.lower():
                                 evidence = snippet
                                 break
@@ -194,29 +200,39 @@ class OpenFDAProvider(BaseProvider):
         if len(drugs) < 2:
             return []
 
-        drug_synonyms = {
-            "warfarin": ["anticoagulant", "blood thinner", "coumadin", "jantoven"],
-            "aspirin": ["nsaid", "salicylates", "platelet inhibitor"],
-        }
+        import asyncio
+
+        # Pre-fetch drug info for all drugs to avoid redundant API calls
+        async def fetch_info(d: str):
+            info_list = await self.search(d, limit=1)
+            return d, (info_list[0] if info_list else None)
+
+        drug_infos = await asyncio.gather(*(fetch_info(d) for d in drugs))
 
         found = []
-        for i, drug_a in enumerate(drugs):
-            info_list = await self.search(drug_a, limit=1)
-            if not info_list:
+        for i, (drug_a, info_a) in enumerate(drug_infos):
+            if not info_a:
                 continue
 
-            drug_info = info_list[0]
-            label_text = " ".join(drug_info.interactions).lower()
+            label_text = " ".join(info_a.interactions).lower()
 
-            for j, drug_b in enumerate(drugs):
+            for j, (drug_b, info_b) in enumerate(drug_infos):
                 if i == j:
                     continue
 
-                target_keys = [drug_b.lower()] + drug_synonyms.get(drug_b.lower(), [])
+                target_keys = [drug_b.lower()]
+                if info_b:
+                    if info_b.generic_name:
+                        target_keys.append(info_b.generic_name.lower())
+                    if info_b.brand_name:
+                        target_keys.append(info_b.brand_name.lower())
+
+                target_keys = list(set([k for k in target_keys if k and k != "unknown" and len(k) > 2]))
+
                 for key in target_keys:
                     if key in label_text:
                         evidence = "Source: FDA Label. "
-                        for snippet in drug_info.interactions:
+                        for snippet in info_a.interactions:
                             if key in snippet.lower():
                                 evidence = snippet
                                 break
