@@ -9,22 +9,29 @@ from typing import Any
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.tree import Tree
 
 from medkit import (
     ClinicalConclusion,
     ConditionSummary,
     DrugExplanation,
     MedKit,
+    MedKitConfig,
     MedKitError,
     SearchResults,
 )
+from medkit.logging import setup_logging
 
 app = typer.Typer(help="MedKit - Unified Medical API SDK")
 console = Console()
 
+# Initialize global logging configuration for CLI sessions natively
+_config = MedKitConfig.from_env()
+setup_logging(level=_config.log_level)
+
 
 @app.command()
-def status():
+def status() -> None:
     """Check the health status of all medical data providers."""
     with MedKit() as med:
         table = Table(title="MedKit Provider Health")
@@ -40,9 +47,7 @@ def status():
                 healthy = provider.health_check()
                 latency = (time.perf_counter() - start) * 1000
                 st = (
-                    "[bold green]ONLINE[/bold green]"
-                    if healthy
-                    else "[bold red]OFFLINE[/bold red]"
+                    "[bold green]ONLINE[/bold green]" if healthy else "[bold red]OFFLINE[/bold red]"
                 )
                 table.add_row(name, st, f"{latency:.0f}ms")
             except Exception:
@@ -52,7 +57,7 @@ def status():
 
 
 @app.command()
-def interactions(drugs: str):
+def interactions(drugs: str) -> None:
     """Check for potential interactions between a list of drugs (comma-separated)."""
     final_drugs = [d.strip() for d in drugs.split(",") if d.strip()]
 
@@ -88,7 +93,7 @@ def interactions(drugs: str):
 
 
 @app.command()
-def drug(name: str, as_json: bool = False):
+def drug(name: str, as_json: bool = False) -> None:
     """Search for drug information using OpenFDA."""
     try:
         with MedKit() as med:
@@ -98,9 +103,7 @@ def drug(name: str, as_json: bool = False):
                 console.print(info.model_dump_json(indent=2))
                 return
 
-            console.print(
-                f"[bold green]Drug Information: {info.brand_name}[/bold green]"
-            )
+            console.print(f"[bold green]Drug Information: {info.brand_name}[/bold green]")
             console.print(f"Generic Name: {info.generic_name}")
             console.print(f"Manufacturer: {info.manufacturer or 'N/A'}")
 
@@ -114,7 +117,7 @@ def drug(name: str, as_json: bool = False):
 
 
 @app.command()
-def papers(query: str, limit: int = 5, as_json: bool = False, open: bool = False):
+def papers(query: str, limit: int = 5, as_json: bool = False, open: bool = False) -> None:
     """Search for research papers on PubMed."""
     try:
         with MedKit() as med:
@@ -142,9 +145,7 @@ def papers(query: str, limit: int = 5, as_json: bool = False, open: bool = False
 
 
 @app.command()
-def trials(
-    condition: str, limit: int = 5, as_json: bool = False, recruiting: bool = False
-):
+def trials(condition: str, limit: int = 5, as_json: bool = False, recruiting: bool = False) -> None:
     """Search for clinical trials on ClinicalTrials.gov."""
     try:
         with MedKit() as med:
@@ -156,9 +157,7 @@ def trials(
                 return
 
             if results:
-                console.print(
-                    f"\n[bold magenta]Clinical Trials for '{condition}'[/bold magenta]"
-                )
+                console.print(f"\n[bold magenta]Clinical Trials for '{condition}'[/bold magenta]")
                 for t in results:
                     status = t.status or "N/A"
                     title = t.title or "Unknown Title"
@@ -172,13 +171,13 @@ def trials(
 
 
 @app.command()
-def search(query: str, as_json: bool = False):
+def search(query: str, as_json: bool = False) -> None:
     """Unified search across drugs, papers, and trials."""
     import asyncio
 
     from medkit import AsyncMedKit
 
-    async def _run():
+    async def _run() -> None:
         try:
             async with AsyncMedKit() as med:
                 results = await med.search(query)
@@ -192,9 +191,7 @@ def search(query: str, as_json: bool = False):
                 offline = results.metadata.offline_providers
                 if offline:
                     names = ", ".join(offline)
-                    console.print(
-                        f"\n[dim][!] Limited results. Providers offline: {names}[/dim]"
-                    )
+                    console.print(f"\n[dim][!] Limited results. Providers offline: {names}[/dim]")
         except MedKitError as e:
             console.print(f"[bold red]Error:[/bold red] {e}")
 
@@ -202,23 +199,19 @@ def search(query: str, as_json: bool = False):
 
 
 @app.command()
-def ask(question: str, debug: bool = False):
+def ask(question: str, debug: bool = False) -> None:
     """Ask a medical question in plain English."""
     import asyncio
 
     from medkit import AsyncMedKit
 
-    async def _run():
+    async def _run() -> None:
         try:
             async with AsyncMedKit() as med:
-                with console.status(
-                    f"[bold blue]Processing: '{question}'...[/bold blue]"
-                ):
+                with console.status(f"[bold blue]Processing: '{question}'...[/bold blue]"):
                     res = await med.ask(question)
 
-                if isinstance(res, SearchResults) and not any(
-                    [res.drugs, res.papers, res.trials]
-                ):
+                if isinstance(res, SearchResults) and not any([res.drugs, res.papers, res.trials]):
                     console.print(
                         f"[yellow]No information found for '{question}'. "
                         "Try stripping medical jargon.[/yellow]"
@@ -234,17 +227,71 @@ def ask(question: str, debug: bool = False):
                 else:
                     console.print(str(res))
 
-                # Use metadata if available via res.metadata or similar
-                # DrugExplanation and others don't have metadata yet,
-                # but SearchResults (passed to synthesize) does.
-                # For now, we rely on the search results within the engine.
         except MedKitError as e:
             console.print(f"[bold red]Error:[/bold red] {e}")
 
     asyncio.run(_run())
 
 
-def _render_search_results(results: Any, query: str):
+@app.command()
+def graph(query: str, as_json: bool = False) -> None:
+    """Build a relationship graph mapping drugs, papers, and trials for a query term."""
+    import asyncio
+    from medkit import AsyncMedKit
+
+    async def _run() -> None:
+        try:
+            async with AsyncMedKit() as med:
+                with console.status(f"[bold blue]Building Graph for: '{query}'...[/bold blue]"):
+                    g = await med.graph(query)
+
+                if as_json:
+                    console.print(json.dumps(g.to_dict(), indent=2))
+                    return
+
+                if not g.nodes:
+                    console.print(f"[yellow]No graph relationships found for '{query}'.[/yellow]")
+                    return
+
+                console.print(f"\n[bold cyan]Knowledge Graph: {query}[/bold cyan]")
+                console.print(f"Nodes: {len(g.nodes)} | Edges: {len(g.edges)}\n")
+
+                tree = Tree(f"[white on blue] {query.title()} [/white on blue]")
+
+                # Group nodes by type
+                drugs = [n for n in g.nodes if n.type == "drug"]
+                trials = [n for n in g.nodes if n.type == "trial"]
+                papers = [n for n in g.nodes if n.type == "paper"]
+
+                drug_branch = tree.add("[bold white]Drugs[/bold white]")
+                if drugs:
+                    for d in drugs[:10]:
+                        drug_branch.add(f"[dim]{d.label}[/dim]")
+                else:
+                    drug_branch.add("[dim]None found[/dim]")
+
+                trial_branch = tree.add("[bold white]Trials[/bold white]")
+                if trials:
+                    for t in trials[:10]:
+                        trial_branch.add(f"[dim]{t.label}[/dim]")
+                else:
+                    trial_branch.add("[dim]None found[/dim]")
+
+                paper_branch = tree.add("[bold white]Papers[/bold white]")
+                if papers:
+                    for p in papers[:10]:
+                        paper_branch.add(f"[dim]{p.label}[/dim]")
+                else:
+                    paper_branch.add("[dim]None found[/dim]")
+
+                console.print(tree)
+
+        except MedKitError as e:
+            console.print(f"[bold red]Error:[/bold red] {e}")
+
+    asyncio.run(_run())
+
+def _render_search_results(results: Any, query: str) -> None:
     if hasattr(results, "drugs") and results.drugs:
         console.print("\n[bold green]=== Drugs ===[/bold green]")
         for d in results.drugs[:3]:
@@ -261,16 +308,14 @@ def _render_search_results(results: Any, query: str):
             console.print(f"- {t.nct_id}: {t.status or 'N/A'}")
 
 
-def _render_summary(s: ConditionSummary):
+def _render_summary(s: ConditionSummary) -> None:
     console.print(f"\n[bold blue]Condition: {s.condition}[/bold blue]")
     if s.drugs:
         drug_list = ", ".join(s.drugs[:5])
         console.print(f"[bold]Relevant Drugs:[/bold] {drug_list}")
     if s.papers:
         count = len(s.papers)
-        console.print(
-            f"[bold cyan]Scientific Evidence:[/bold cyan] {count} publications found."
-        )
+        console.print(f"[bold cyan]Scientific Evidence:[/bold cyan] {count} publications found.")
         for p in s.papers[:2]:
             console.print(f"  - {p.title} ({p.year or 'N/A'})")
     if s.trials:
@@ -279,7 +324,7 @@ def _render_summary(s: ConditionSummary):
         )
 
 
-def _render_explanation(e: DrugExplanation):
+def _render_explanation(e: DrugExplanation) -> None:
     if e.drug_info:
         console.print(f"\n[bold green]Drug: {e.drug_info.brand_name}[/bold green]")
         console.print(f"Generic: {e.drug_info.generic_name}")
@@ -288,30 +333,24 @@ def _render_explanation(e: DrugExplanation):
             console.print(f"Indications: {e.drug_info.indications[0][:150]}...")
 
     if e.papers:
-        console.print(
-            f"\n[bold cyan]Key Research ({len(e.papers)} papers):[/bold cyan]"
-        )
+        console.print(f"\n[bold cyan]Key Research ({len(e.papers)} papers):[/bold cyan]")
         for p in e.papers[:3]:
             console.print(f"- {p.title}")
 
     if e.trials:
-        console.print(
-            f"\n[bold magenta]Related Trials ({len(e.trials)}):[/bold magenta]"
-        )
+        console.print(f"\n[bold magenta]Related Trials ({len(e.trials)}):[/bold magenta]")
         for t in e.trials[:3]:
             console.print(f"- {t.nct_id}: {t.status}")
 
 
-def _render_conclusion(c: ClinicalConclusion):
+def _render_conclusion(c: ClinicalConclusion) -> None:
     console.print("\n[bold white on green] Clinical Conclusion [/bold white on green]")
     console.print(f"\n[bold]Summary:[/bold] {c.summary}")
 
     score = getattr(c, "confidence_score", 0.0)
     color = "green" if score > 0.7 else "yellow" if score > 0.4 else "red"
     meter = "█" * int(score * 20) + "░" * (20 - int(score * 20))
-    console.print(
-        f"[bold]Evidence Confidence:[/bold] [{color}]{meter}[/{color}] {score:.2f}"
-    )
+    console.print(f"[bold]Evidence Confidence:[/bold] [{color}]{meter}[/{color}] {score:.2f}")
 
     interv = ", ".join(getattr(c, "top_interventions", []))
     console.print(f"\n[bold cyan]Top Interventions:[/bold cyan] {interv}")

@@ -12,7 +12,7 @@ class Exporter:
     """
 
     @staticmethod
-    def to_json(data: Any, path: str | Path):
+    def to_json(data: Any, path: str | Path) -> None:
         content = ""
         if hasattr(data, "model_dump_json"):
             content = data.model_dump_json(indent=2)
@@ -23,16 +23,14 @@ class Exporter:
             f.write(content)
 
     @staticmethod
-    def to_csv(data: Any, path: str | Path):
+    def to_csv(data: Any, path: str | Path) -> None:
         """
         Flatten and export to CSV.
         """
         records = []
         if hasattr(data, "drugs"):  # SearchResults
             for d in data.drugs:
-                records.append(
-                    {"type": "drug", "name": d.brand_name, "detail": d.generic_name}
-                )
+                records.append({"type": "drug", "name": d.brand_name, "detail": d.generic_name})
             for p in data.papers:
                 records.append({"type": "paper", "name": p.title, "detail": p.pmid})
             for t in data.trials:

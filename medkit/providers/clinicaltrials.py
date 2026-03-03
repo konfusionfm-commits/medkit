@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import httpx
 
-from ..exceptions import APIError
+from ..exceptions import APIError, NotFoundError
 from ..models import ClinicalTrial
 from .base import BaseProvider
 
@@ -24,18 +24,11 @@ class ClinicalTrialsProvider(BaseProvider):
         self.name = "clinicaltrials"
         self.base_url = "https://clinicaltrials.gov/api/v2/studies"
         self.headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) "
-                "Gecko/20100101 Firefox/110.0"
-            ),
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-US,en;q=0.5",
-            "DNT": "1",
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-site",
         }
 
     def _curl_fetch(self, url: str, params: Optional[Dict[str, Any]] = None) -> str:
@@ -83,8 +76,7 @@ class ClinicalTrialsProvider(BaseProvider):
             interventions = [
                 str(i.get("name", ""))
                 for i in arms_info.get("interventions", [])
-                if i.get("name")
-                and (not i.get("type") or i.get("type").upper() in relevant_types)
+                if i.get("name") and (not i.get("type") or i.get("type").upper() in relevant_types)
             ]
 
             return ClinicalTrial(
@@ -93,8 +85,7 @@ class ClinicalTrialsProvider(BaseProvider):
                 status=status_info.get("overallStatus", "UNKNOWN"),
                 conditions=conditions_info.get("conditions", []),
                 description=description_info.get("briefSummary", "N/A"),
-                recruiting=status_info.get("overallStatus")
-                in ["RECRUITING", "AVAILABLE"],
+                recruiting=status_info.get("overallStatus") in ["RECRUITING", "AVAILABLE"],
                 url=f"https://clinicaltrials.gov/study/{nct_id}",
                 phase=phases,
                 location=[],
@@ -117,32 +108,30 @@ class ClinicalTrialsProvider(BaseProvider):
             )
 
     async def health_check_async(self) -> bool:
-        async_client = cast(httpx.AsyncClient, self.client)
+        # Check standard endpoint with a fast timeout
         try:
-            resp = await async_client.get(
-                self.base_url, params={"pageSize": 1}, headers=self.headers, timeout=2.0
-            )
-            if resp.status_code == 200:
-                return True
+            client = cast(httpx.AsyncClient, self.client)
+            resp = await client.get(self.base_url, params={"pageSize": 1}, timeout=2.0)
+            resp.raise_for_status()
+            return True
         except Exception:
             pass
-        res = await asyncio.get_event_loop().run_in_executor(
-            None, self._curl_fetch, self.base_url, {"pageSize": 1}
-        )
+
+        # Fallback to curl
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(None, self._curl_fetch, self.base_url, {"pageSize": 1})
         return bool(res and '"studies"' in res)
 
     def health_check(self) -> bool:
-        if not isinstance(self.client, httpx.Client):
-            return True
-        sync_client = cast(httpx.Client, self.client)
         try:
-            resp = sync_client.get(
-                self.base_url, params={"pageSize": 1}, headers=self.headers, timeout=2.0
-            )
-            if resp.status_code == 200:
-                return True
+            client = cast(httpx.Client, self.client)
+            resp = client.get(self.base_url, params={"pageSize": 1}, timeout=2.0)
+            resp.raise_for_status()
+            return True
         except Exception:
             pass
+
+        # Fallback to curl
         res = self._curl_fetch(self.base_url, {"pageSize": 1})
         return bool(res and '"studies"' in res)
 
@@ -150,82 +139,121 @@ class ClinicalTrialsProvider(BaseProvider):
         return ["trials", "studies", "recruitment"]
 
     def search_sync(self, query: str, **kwargs: Any) -> List[ClinicalTrial]:
+        from ..validators import sanitize_query
+
+        query = sanitize_query(query)
         limit = kwargs.get("limit", 10)
         recruiting = kwargs.get("recruiting", False)
+
         params = {"pageSize": limit, "query.term": query}
         if recruiting:
             params["filter.overallStatus"] = "RECRUITING"
 
-        if isinstance(self.client, httpx.Client):
-            try:
-                resp = self.client.get(
-                    self.base_url, params=params, headers=self.headers, timeout=5.0
-                )
-                resp.raise_for_status()
-                studies = resp.json().get("studies", [])
-                return [self._parse_study(s) for s in studies]
-            except Exception:
-                pass
-
-        # Fallback to curl
-        res = self._curl_fetch(self.base_url, params)
-        if res:
-            try:
-                data = json.loads(res)
-                studies = data.get("studies", [])
-                return [self._parse_study(s) for s in studies]
-            except Exception:
-                pass
-        return []
+        try:
+            url = f"{self.base_url}?{urlencode(params)}"
+            client = cast(httpx.Client, self.client)
+            response = client.get(url, timeout=self.config.timeout)
+            response.raise_for_status()
+            studies = response.json().get("studies", [])
+            return [self._parse_study(s) for s in studies]
+        except Exception as e:
+            # Fallback to curl silently on TLS/Request issues
+            res = self._curl_fetch(self.base_url, params)
+            if res:
+                try:
+                    data = json.loads(res)
+                    studies = data.get("studies", [])
+                    return [self._parse_study(s) for s in studies]
+                except Exception:
+                    pass
+            if not isinstance(e, (APIError, NotFoundError)):
+                raise APIError(str(e), provider=self.name) from e
+            raise
 
     async def search(self, query: str, **kwargs: Any) -> List[ClinicalTrial]:
+        from ..validators import sanitize_query
+
+        query = sanitize_query(query)
         limit = kwargs.get("limit", 10)
         recruiting = kwargs.get("recruiting", False)
+
         params = {"pageSize": limit, "query.term": query}
         if recruiting:
             params["filter.overallStatus"] = "RECRUITING"
 
-        async_client = cast(httpx.AsyncClient, self.client)
         try:
-            resp = await async_client.get(
-                self.base_url, params=params, headers=self.headers, timeout=5.0
-            )
-            resp.raise_for_status()
-            studies = resp.json().get("studies", [])
+            url = f"{self.base_url}?{urlencode(params)}"
+            client = cast(httpx.AsyncClient, self.client)
+            response = await client.get(url, timeout=self.config.timeout)
+            response.raise_for_status()
+            studies = response.json().get("studies", [])
             return [self._parse_study(s) for s in studies]
-        except Exception:
-            pass
-
-        # Fallback to curl
-        res = await asyncio.get_event_loop().run_in_executor(
-            None, self._curl_fetch, self.base_url, params
-        )
-        if res:
-            try:
-                data = json.loads(res)
-                studies = data.get("studies", [])
-                return [self._parse_study(s) for s in studies]
-            except Exception:
-                pass
-        return []
+        except Exception as e:
+            loop = asyncio.get_event_loop()
+            res = await loop.run_in_executor(None, self._curl_fetch, self.base_url, params)
+            if res:
+                try:
+                    data = json.loads(res)
+                    studies = data.get("studies", [])
+                    return [self._parse_study(s) for s in studies]
+                except Exception:
+                    pass
+            if not isinstance(e, (APIError, NotFoundError)):
+                raise APIError(str(e), provider=self.name) from e
+            raise
 
     def get_sync(self, item_id: str) -> ClinicalTrial:
-        if not isinstance(self.client, httpx.Client):
-            return self._parse_study({"nctId": item_id})
+        from ..validators import validate_nct_id
+
+        item_id = validate_nct_id(item_id)
+        url = f"{self.base_url}/{item_id}"
+
         try:
-            resp = self.client.get(f"{self.base_url}/{item_id}", headers=self.headers)
-            resp.raise_for_status()
-            return self._parse_study(resp.json())
+            client = cast(httpx.Client, self.client)
+            response = client.get(url, timeout=self.config.timeout)
+            response.raise_for_status()
+            return self._parse_study(response.json())
         except Exception as e:
-            raise APIError(f"ClinicalTrials.gov sync API error for {item_id}: {e}")
+            if (
+                getattr(e, "status_code", None) == 404
+                or getattr(getattr(e, "response", None), "status_code", None) == 404
+            ):
+                raise NotFoundError(f"Trial {item_id} not found.", provider=self.name)
+
+            res = self._curl_fetch(url)
+            if res:
+                try:
+                    return self._parse_study(json.loads(res))
+                except Exception:
+                    pass
+
+            if not isinstance(e, (APIError, NotFoundError)):
+                raise APIError(str(e), provider=self.name) from e
+            raise
 
     async def get(self, item_id: str) -> ClinicalTrial:
-        async_client = cast(httpx.AsyncClient, self.client)
+        from ..validators import validate_nct_id
+
+        item_id = validate_nct_id(item_id)
+        url = f"{self.base_url}/{item_id}"
+
         try:
-            resp = await async_client.get(
-                f"{self.base_url}/{item_id}", headers=self.headers
-            )
-            resp.raise_for_status()
-            return self._parse_study(resp.json())
+            client = cast(httpx.AsyncClient, self.client)
+            response = await client.get(url, timeout=self.config.timeout)
+            response.raise_for_status()
+            return self._parse_study(response.json())
         except Exception as e:
-            raise APIError(f"ClinicalTrials.gov async API error for {item_id}: {e}")
+            if getattr(e, "status_code", None) == 404:
+                raise NotFoundError(f"Trial {item_id} not found.", provider=self.name)
+
+            loop = asyncio.get_event_loop()
+            res = await loop.run_in_executor(None, self._curl_fetch, url)
+            if res:
+                try:
+                    return self._parse_study(json.loads(res))
+                except Exception:
+                    pass
+
+            if not isinstance(e, (APIError, NotFoundError)):
+                raise APIError(str(e), provider=self.name) from e
+            raise

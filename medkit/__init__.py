@@ -2,7 +2,7 @@
 MedKit - A unified Python SDK for public medical APIs.
 """
 
-from .cache import DiskCache, MemoryCache
+from .cache_backends import DiskCache, MemoryCache
 from .client import AsyncMedKit, MedKit
 from .exceptions import (
     APIError,
@@ -26,10 +26,19 @@ from .models import (
     SearchResults,
 )
 
-__version__ = "1.4.0"
+__version__ = "3.0.0"
+
+from .config import MedKitConfig, ProviderConfig, RetryConfig
+from .retry import retry
+
 __all__ = [
+    "__version__",
     "MedKit",
     "AsyncMedKit",
+    "MedKitConfig",
+    "ProviderConfig",
+    "RetryConfig",
+    "retry",
     "DrugInfo",
     "ResearchPaper",
     "ClinicalTrial",

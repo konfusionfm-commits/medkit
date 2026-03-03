@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "medkit-sdk"
-version = "2.0.0"
+version = "3.0.0"
 description = "A unified Python SDK for public medical APIs (OpenFDA, PubMed, ClinicalTrials.gov)"
 readme = "README.md"
 authors = [
@@ -15,7 +15,8 @@ dependencies = [
     "httpx[http2]>=0.25.0",
     "pydantic>=2.4.0",
     "typer>=0.9.0",
-    "rich>=13.6.0"
+    "rich>=13.6.0",
+    "structlog>=23.1.0"
 ]
 
 [project.optional-dependencies]

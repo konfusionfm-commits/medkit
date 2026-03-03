@@ -34,9 +34,7 @@ class InteractionEngine:
             return "Moderate"
         return "Low"
 
-    async def check(
-        self, drugs: List[str], provider: "OpenFDAProvider"
-    ) -> List[Dict[str, Any]]:
+    async def check(self, drugs: List[str], provider: "OpenFDAProvider") -> List[Dict[str, Any]]:
         """Check for interactions between a list of drugs using live FDA data."""
         if not drugs or len(drugs) < 2:
             return []
@@ -58,9 +56,7 @@ class InteractionEngine:
 
         return warnings
 
-    def check_sync(
-        self, drugs: List[str], provider: "OpenFDAProvider"
-    ) -> List[Dict[str, Any]]:
+    def check_sync(self, drugs: List[str], provider: "OpenFDAProvider") -> List[Dict[str, Any]]:
         """Synchronous version of interaction check."""
         if not drugs or len(drugs) < 2:
             return []

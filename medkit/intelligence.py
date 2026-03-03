@@ -85,9 +85,7 @@ class IntelligenceEngine:
         # Sort by frequency, then alphabetically for ties
         # Filter out unusually long names which are likely procedural descriptions
         filtered_interv = {
-            name: count
-            for name, count in intervention_counts.items()
-            if len(name) < 100
+            name: count for name, count in intervention_counts.items() if len(name) < 100
         }
 
         sorted_interv = sorted(filtered_interv.items(), key=lambda x: (-x[1], x[0]))

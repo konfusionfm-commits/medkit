@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Health API Wrapper Documentation</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- GSAP & ScrollTrigger Plugins -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+</head>
+
+<body>
+
+    <!-- Fixed Canvas Background (Pinned) -->
+    <div class="video-container">
+        <canvas id="bg-canvas"></canvas>
+        <div class="video-overlay"></div>
+    </div>
+
+    <!-- UI Overlay Layer (Fixed in viewport, pointer-events none to allow scrolling) -->
+    <div class="ui-layer">
+
+        <!-- Phase 1: Intro Overlay -->
+        <div class="phase-ui phase1-text">
+            <h1 class="gradient-text">MedKit SDK</h1>
+            <p>The high-performance, unified medical API wrapper for modern developers.</p>
+            <div class="scroll-indicator">
+                <span>Scroll to Explore</span>
+                <div class="arrow">↓</div>
+            </div>
+        </div>
+
+        <!-- Phase 3: Interactive Documentation Menu -->
+        <div class="phase-ui phase3-ui">
+            <h2>Core Infrastructure</h2>
+            <div class="docs-grid">
+                <a href="docs_core.html" class="doc-btn">
+                    <span class="icon">⚙️</span>
+                    <span class="label">Core API</span>
+                </a>
+                <a href="docs_intelligence.html" class="doc-btn">
+                    <span class="icon">🔎</span>
+                    <span class="label">Ask Engine</span>
+                </a>
+                <a href="docs_interactions.html" class="doc-btn">
+                    <span class="icon">⚠️</span>
+                    <span class="label">Interactions</span>
+                </a>
+                <a href="docs_resiliency.html" class="doc-btn">
+                    <span class="icon">⚙️</span>
+                    <span class="label">Resiliency</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Phase 5: Outro / Call to Action -->
+        <div class="phase-ui phase5-cta">
+            <h2>Start building with MedKit today.</h2>
+            <p>Please star our GitHub repo to support the open-source medical community.</p>
+            <a href="https://github.com/interestng/medkit" target="_blank" rel="noopener noreferrer"
+                class="btn btn-github">
+                ⭐ Star on GitHub
+            </a>
+        </div>
+
+    </div>
+
+    <!-- The invisible scroll track that provides scrollable height for GSAP -->
+    <div class="scroll-container"></div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

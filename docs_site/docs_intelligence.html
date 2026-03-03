@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Intelligence & Synthesis | MedKit Docs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script src="docs.js" defer></script>
+</head>
+
+<body class="doc-page">
+
+    <nav class="top-nav">
+        <a href="index.html" class="btn-back">MedKit</a>
+        <div class="nav-title">Documentation</div>
+    </nav>
+
+    <main class="doc-content">
+        <h1 class="gradient-text">Clinical Intelligence</h1>
+        <p class="subtitle">Extract medical insights using the Ask Engine.</p>
+
+        <section class="doc-section">
+            <h2>1. The Ask Engine</h2>
+            <p>The AskEngine is the core of MedKit. Instead of making you sift through huge JSON responses from PubMed
+                and ClinicalTrials, MedKit reads your query and finds the biomedical relationships for you.</p>
+            <pre><code class="language-python">import asyncio
+from medkit import AsyncMedKit
+
+async def main():
+    async with AsyncMedKit() as med:
+        # Natural Language Query
+        query = "What is the clinical status of Pembrolizumab for Lung Cancer?"
+        conclusion = await med.ask(query)
+        
+        print(f"Confidence: {conclusion.confidence_score}")
+        print(f"Summary: {conclusion.summary}")
+        
+        for intervention in conclusion.top_interventions:
+            print(f"- Found Intervention: {intervention}")
+
+if __name__ == "__main__":
+    asyncio.run(main())</code></pre>
+        </section>
+
+        <section class="doc-section">
+            <h2>2. Frequency-Ranked Synthesis</h2>
+            <p>Here is what happens when you call <code>med.ask()</code>:</p>
+            <ol>
+                <li>Fires asynchronous background tasks searching both PubMed and ClinicalTrials.gov simultaneously.
+                </li>
+                <li>Fetches the top 50 related clinical trials and 25 research papers.</li>
+                <li>Utilizes regex-based extraction to filter out observational, behavioral, and placebo-controlled
+                    group criteria.</li>
+                <li>Isolates strictly biological and drug-based interventions.</li>
+                <li>Ranks these interventions by their frequency of appearance alongside the target query condition
+                    across the entire localized dataset.</li>
+            </ol>
+            <p>This yields incredibly high-precision <code>ClinicalConclusion</code> models without needing to fine-tune
+                an LLM or pay for external token inference.</p>
+        </section>
+
+        <section class="doc-section">
+            <h2>3. Using the CLI</h2>
+            <p>You can execute the exact same synthesis engine directly from the terminal:</p>
+            <pre><code class="language-bash">$ medkit ask "Treatment outcomes for Type 2 Diabetes"
+
+ Clinical Conclusion 
+
+Summary: Metformin remains the primary frontline intervention supported by the 
+majority of clinical trials, alongside increasing reliance on GLP-1 
+agonists such as Semaglutide for metabolic regulation.
+Evidence Confidence: [█████████████████░░░] 0.89
+
+Top Interventions: Metformin, Semaglutide, Empagliflozin</code></pre>
+        </section>
+
+        <section class="doc-section">
+            <h2>4. Strictly Typed Pydantic Models</h2>
+            <p>Since MedKit uses <code>Pydantic V2</code> and has proper Python type hints, your editor will give you
+                full autocomplete down the entire object tree.</p>
+            <pre><code class="language-python">from pydantic import BaseModel, Field
+
+from typing import List, Dict
+
+# This is the object topology returned by med.ask()
+class ClinicalConclusion(BaseModel):
+    query: str
+    summary: str
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    evidence_count: Dict[str, int]
+    top_interventions: List[str]
+    suggested_trials: List[str]
+    last_updated: float</code></pre>
+        </section>
+
+        <section class="doc-section">
+            <h2>5. Interactive Knowledge Graphs</h2>
+            <p>The CLI also features a powerful graph visualization tool. By running <code>medkit graph</code>, the SDK
+                maps the biological relationships across returned Drugs, Trials, and Papers, allowing you to quickly
+                visualize implicit connections.</p>
+            <pre><code class="language-bash">$ medkit graph "lung cancer"
+
+Knowledge Graph: lung cancer
+Nodes: 26 | Edges: 8
+
+ Lung Cancer 
+├── Drugs
+│   └── None found
+├── Trials
+│   ├── A Study of QL1706 Combined Wit...
+│   ├── Circulating Tumor DNA Detectio...
+│   └── Trial of Single Protein Encaps...
+└── Papers
+    ├── Phase III placebo-controlled o...
+    └── Therapeutic strategies for eld...</code></pre>
+        </section>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 4rem;">
+            <a href="docs_core.html" class="btn btn-github">← Previous</a>
+            <a href="docs_interactions.html" class="btn btn-github">Next: Drug Interactions →</a>
+        </div>
+    </main>
+
+</body>
+
+</html>

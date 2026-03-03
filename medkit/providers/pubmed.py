@@ -38,9 +38,8 @@ class PubMedProvider(BaseProvider):
         """Check if PubMed API is reachable synchronously."""
         if not isinstance(self.client, httpx.Client):
             return True
-        sync_client = cast(httpx.Client, self.client)
         try:
-            resp = sync_client.get(
+            resp = self.client.get(
                 self.search_url,
                 params={"db": "pubmed", "term": "test", "retmax": 1},
                 timeout=2.0,
@@ -52,9 +51,7 @@ class PubMedProvider(BaseProvider):
     def capabilities(self) -> List[str]:
         return ["papers", "publications", "literature"]
 
-    def _parse_summaries(
-        self, data: Dict[str, Any], pmids: List[str]
-    ) -> List[ResearchPaper]:
+    def _parse_summaries(self, data: Dict[str, Any], pmids: List[str]) -> List[ResearchPaper]:
         """Parse PubMed API results into ResearchPaper models."""
         results = data.get("result", {})
         papers = []
@@ -98,94 +95,91 @@ class PubMedProvider(BaseProvider):
 
     def get_sync(self, item_id: str) -> ResearchPaper:
         """Retrieve a single research paper by PMID synchronously."""
-        sync_client = cast(httpx.Client, self.client)
+        from ..validators import validate_pmid
+
+        item_id = validate_pmid(item_id)
+
+        url = f"{self.summary_url}?db=pubmed&id={item_id}&retmode=json"
+
         try:
-            response = sync_client.get(
-                self.summary_url,
-                params={"db": "pubmed", "id": item_id, "retmode": "json"},
-            )
-            response.raise_for_status()
+            response = self._sync_request("GET", url)
             results = self._parse_summaries(response.json(), [item_id])
             if not results:
-                raise NotFoundError(f"PMID {item_id} not found in PubMed.")
+                raise NotFoundError(f"PMID {item_id} not found in PubMed.", provider=self.name)
             return results[0]
         except Exception as e:
-            raise APIError(f"PubMed sync get error: {e}")
+            if not isinstance(e, (APIError, NotFoundError)):
+                raise APIError(str(e), provider=self.name) from e
+            raise
 
     async def get(self, item_id: str) -> ResearchPaper:
         """Retrieve a single research paper by PMID asynchronously."""
-        async_client = cast(httpx.AsyncClient, self.client)
+        from ..validators import validate_pmid
+
+        item_id = validate_pmid(item_id)
+
+        url = f"{self.summary_url}?db=pubmed&id={item_id}&retmode=json"
+
         try:
-            response = await async_client.get(
-                self.summary_url,
-                params={"db": "pubmed", "id": item_id, "retmode": "json"},
-            )
-            response.raise_for_status()
+            response = await self._async_request("GET", url)
             results = self._parse_summaries(response.json(), [item_id])
             if not results:
-                raise NotFoundError(f"PMID {item_id} not found in PubMed.")
+                raise NotFoundError(f"PMID {item_id} not found in PubMed.", provider=self.name)
             return results[0]
         except Exception as e:
-            raise APIError(f"PubMed async get error: {e}")
+            if not isinstance(e, (APIError, NotFoundError)):
+                raise APIError(str(e), provider=self.name) from e
+            raise
 
-    def search_sync(self, query: str, **kwargs: Any) -> List[ResearchPaper]:
+    def search_sync(self, query: str, limit: int = 10, **kwargs: Any) -> list[ResearchPaper]:
         """Search for research papers synchronously."""
-        limit = kwargs.get("limit", 10)
-        sync_client = cast(httpx.Client, self.client)
+        from ..validators import sanitize_query
+
+        query = sanitize_query(query)
+
+        search_url = f"{self.search_url}?db=pubmed&term={query}&retmode=json&retmax={limit}"
+
         try:
             # Step 1: Search for IDs
-            search_res = sync_client.get(
-                self.search_url,
-                params={
-                    "db": "pubmed",
-                    "term": query,
-                    "retmode": "json",
-                    "retmax": limit,
-                },
-            )
-            search_res.raise_for_status()
+            search_res = self._sync_request("GET", search_url)
             pmids = search_res.json().get("esearchresult", {}).get("idlist", [])
 
             if not pmids:
                 return []
 
             # Step 2: Get summaries
-            summary_res = sync_client.get(
-                self.summary_url,
-                params={"db": "pubmed", "id": ",".join(pmids), "retmode": "json"},
-            )
-            summary_res.raise_for_status()
+            pmids_str = ",".join(pmids)
+            summary_url = f"{self.summary_url}?db=pubmed&id={pmids_str}&retmode=json"
+
+            summary_res = self._sync_request("GET", summary_url)
             return self._parse_summaries(summary_res.json(), pmids)
-        except Exception as e:
-            raise APIError(f"PubMed sync search error: {e}")
+
+        except httpx.HTTPError as e:
+            raise APIError(f"Failed to fetch data from PubMed: {e}", provider=self.name) from e
 
     async def search(self, query: str, **kwargs: Any) -> List[ResearchPaper]:
         """Search for research papers asynchronously."""
+        from ..validators import sanitize_query
+
+        query = sanitize_query(query)
         limit = kwargs.get("limit", 10)
-        async_client = cast(httpx.AsyncClient, self.client)
+
+        search_url = f"{self.search_url}?db=pubmed&term={query}&retmode=json&retmax={limit}"
+
         try:
             # Step 1: Search for IDs
-            search_res = await async_client.get(
-                self.search_url,
-                params={
-                    "db": "pubmed",
-                    "term": query,
-                    "retmode": "json",
-                    "retmax": limit,
-                },
-            )
-            search_res.raise_for_status()
+            search_res = await self._async_request("GET", search_url)
             pmids = search_res.json().get("esearchresult", {}).get("idlist", [])
 
             if not pmids:
                 return []
 
             # Step 2: Get summaries
-            summary_res = await async_client.get(
-                self.summary_url,
-                params={"db": "pubmed", "id": ",".join(pmids), "retmode": "json"},
-            )
-            summary_res.raise_for_status()
+            pmids_str = ",".join(pmids)
+            summary_url = f"{self.summary_url}?db=pubmed&id={pmids_str}&retmode=json"
+
+            summary_res = await self._async_request("GET", summary_url)
             return self._parse_summaries(summary_res.json(), pmids)
-        except Exception as e:
-            raise APIError(f"PubMed async search error: {e}")
+
+        except httpx.HTTPError as e:
+            raise APIError(f"Failed to fetch data from PubMed: {e}", provider=self.name) from e

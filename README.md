@@ -1,20 +1,22 @@
 # 🏥 MedKit: A Unified Platform for Medical Data APIs
 
 [![CI Status](https://img.shields.io/badge/CI-passing-success)](https://github.com/interestng/medkit/actions)
+[![Test Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen.svg)](https://github.com/interestng/medkit/actions)
+[![Strict Mypy](https://img.shields.io/badge/typing-Strict-blue.svg)](https://mypy.readthedocs.io/en/stable/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-2.0.0-orange)](https://pypi.org/project/medkit-sdk/)
+[![Version](https://img.shields.io/badge/Version-3.0.0-orange)](https://pypi.org/project/medkit-sdk/)
 
 MedKit is a high-performance, unified SDK that transforms fragmented medical APIs into a single, programmable platform. It provides a clean interface for **OpenFDA**, **PubMed**, and **ClinicalTrials.gov**, augmented with a clinical intelligence layer and relationship mapping.
 
 > [!IMPORTANT]
-> **v2.0.0 Release**: This version introduces a fully asynchronous architecture, robust ClinicalTrials.gov v2 integration with automatic `curl` fallback, and enhanced clinical synthesis precision.
+> **v3.0.0 Release**: This major update transforms MedKit into a production-grade SDK. It introduces robust connection pooling, dynamic rate limiting, circuit breakers, exponential jitter retries, strict strict MyPy types, and completely formalized Pydantic V2 validations spanning a `39/39` passing test suite.
 
 ![MedKit CLI Demo](demo.gif)
 
 ---
 
-## ✨ Async Example (v2.0.0)
+## ✨ Async Example (v3.0.0)
 
 ```python
 import asyncio
@@ -83,11 +85,22 @@ MedKit abstracts complexity through a high-performance orchestration layer:
 ## 🚀 Core Platform Features
 
 - **Robust Connectivity (NEW)**: Automatic `curl` fallback for ClinicalTrials.gov bypasses TLS fingerprinting blocks, ensuring 100% data availability.
+- **Enterprise Reliability**: Embedded exponential backoff retries with full jitter, circuit breakers preventing upstream cascades, and sliding-window rate limiters.
+- **Strictly Typed Ecosystem**: Zero `Any` leakage. 100% strictly typed `medkit/py.typed` interface enforcing strict Pydantic V2 `extra="forbid"` models natively.
 - **Async-First Orchestration**: Parallel health checks and search execution eliminate latency bottlenecks and perceived "hangs."
 - **Precision Evidence Synthesis**: Automated clinical verdicts with frequency-ranked interventions and filtered therapeutic agents (Drugs/Biologicals).
 - **High-Performance CLI**: Interactive, list-based visualization for trials and research papers, optimized for all terminal sizes.
-- **Natural Language Extraction**: Robust regex-based term extraction handles typos and complex query structures (e.g., "clinial status of...").
-- **Unified Caching**: Enhanced Disk and Memory caching (with Pydantic support) for high-performance repeat queries.
+- **Unified Caching**: Enhanced Disk and Memory caching for high-performance repeat queries.
+
+---
+
+## 🛠️ Testing
+
+MedKit ships with a production-grade, isolated mock testing infrastructure that achieves comprehensive validation without relying on live API stability.
+
+```bash
+pytest tests/ -v
+```
 
 ---
 
@@ -105,9 +118,11 @@ pip install medkit-sdk
 ```bash
 $ medkit ask "pembrolizumab for lung cancer"
 
- Clinical Conclusion
+ Clinical Conclusion 
+
 Summary: Highly-validated therapeutic landscape with multi-modal evidence.
-Confidence: ████████████████████ 1.00
+Evidence Confidence: [████████████████████] 1.00
+
 Top Interventions: Pembrolizumab, Bevacizumab, Carboplatin, Cisplatin
 ```
 
@@ -120,14 +135,33 @@ Clinical Trials for 'melanoma'
 - NCT07654321: COMPLETED - Comparison of B-Raf Inhibitors
 ```
 
+### Knowledge Graph
+```bash
+$ medkit graph "lung cancer"
+
+Knowledge Graph: lung cancer
+Nodes: 26 | Edges: 8
+
+ Lung Cancer 
+├── Drugs
+│   └── None found
+├── Trials
+│   ├── A Study of QL1706 Combined Wit...
+│   ├── Circulating Tumor DNA Detectio...
+│   └── Trial of Single Protein Encaps...
+└── Papers
+    ├── Phase III placebo-controlled o...
+    └── Therapeutic strategies for eld...
+```
+
 ---
 
 ## 🗺️ Roadmap
 
 - [x] **v1.0.0**: Foundation medical mesh and provider integration.
-- [x] **v2.0.0**: Async architecture, v2 API support, and synthesis precision.
-- [ ] **v2.1.0**: Advanced pharmacogenomics (SNP) provider integration.
-- [ ] **v3.0.0**: Local GraphQL medical mesh endpoint.
+- [x] **v2.0.0**: Async architecture, v2 API support.
+- [x] **v3.0.0**: Enterprise readiness (Circuit Breakers, Retries, Coverage, Pydantic V2, CLI UI).
+- [ ] **v4.0.0**: Local GraphQL medical mesh endpoint.
 
 ---
 

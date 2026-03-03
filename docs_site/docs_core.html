@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Core API & Authentication | MedKit Docs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script src="docs.js" defer></script>
+</head>
+
+<body class="doc-page">
+
+    <nav class="top-nav">
+        <a href="index.html" class="btn-back">MedKit</a>
+        <div class="nav-title">Documentation</div>
+    </nav>
+
+    <main class="doc-content">
+        <h1 class="gradient-text">Core API & CLI</h1>
+        <p class="subtitle">Get started with the MedKit client and CLI right out of the box.</p>
+
+        <section class="doc-section">
+            <h2>1. Installation</h2>
+            <p>MedKit requires <strong>Python 3.9+</strong>. We recommend setting up a virtual environment before
+                installing.</p>
+            <pre><code class="language-bash">pip install medkit-sdk</code></pre>
+            <p>If you prefer `Poetry` or `uv` for dependency management:</p>
+            <pre><code class="language-bash">poetry add medkit-sdk
+# OR
+uv pip install medkit-sdk</code></pre>
+        </section>
+
+        <section class="doc-section">
+            <h2>2. The CLI</h2>
+            <p>MedKit comes with a built-in CLI, letting you easily query health data right from your terminal. You'll
+                get clean, color-coded tables out of the box.</p>
+
+            <h3>System Status Check</h3>
+            <p>Verify that the upstream providers (OpenFDA, PubMed, and ClinicalTrials.gov) are online and responding
+                properly:</p>
+            <pre><code class="language-bash">$ medkit status
+
+       MedKit Provider Health
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━┓
+┃ Provider       ┃ Status ┃ Latency ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━┩
+│ openfda        │ ONLINE │   267ms │
+│ pubmed         │ ONLINE │   408ms │
+│ clinicaltrials │ ONLINE │   421ms │
+└────────────────┴────────┴─────────┘</code></pre>
+
+            <h3>Command Reference</h3>
+            <ul>
+                <li><code>medkit status</code> - Ping upstream APIs</li>
+                <li><code>medkit drug [NAME]</code> - Search OpenFDA records</li>
+                <li><code>medkit papers [TOPIC]</code> - Query PubMed literature</li>
+                <li><code>medkit trials [CONDITION]</code> - Search ClinicalTrials.gov</li>
+                <li><code>medkit interactions "Drug A, Drug B"</code> - FDA Contraindications check</li>
+                <li><code>medkit ask "Query"</code> - Run the Clinical Intelligence engine</li>
+            </ul>
+        </section>
+
+        <section class="doc-section">
+            <h2>3. Python Usage</h2>
+            <p>MedKit is designed to have <strong>no necessary configuration</strong> when installed. The SDK
+                automatically routes your requests through the generous public free-tiers provided by OpenFDA, PubMed,
+                and ClinicalTrials.gov right out of the box.</p>
+
+            <p>To keep your application blazing fast and to manage HTTP connection pools automatically, simply use
+                `AsyncMedKit` as an async context manager in your application code:</p>
+            <pre><code class="language-python">import asyncio
+from medkit import AsyncMedKit
+
+async def main():
+    # Context manager initializes underlying HTTP/2 pools automatically
+    async with AsyncMedKit() as med:
+        
+        # All provider connections are now warm and ready
+        is_healthy = await med.health_check()
+        print(f"System Health: {is_healthy}")
+
+if __name__ == "__main__":
+    asyncio.run(main())</code></pre>
+        </section>
+
+        <div style="text-align: right; margin-top: 4rem;">
+            <a href="docs_intelligence.html" class="btn btn-github">Next: The Ask Engine →</a>
+        </div>
+    </main>
+
+</body>
+
+</html>

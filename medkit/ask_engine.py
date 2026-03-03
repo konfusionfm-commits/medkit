@@ -56,11 +56,14 @@ class AskEngine:
             r"what (?:is|are) the clinical status of",
             r"what (?:is|are) the status of",
             r"what (?:is|are) clinical trials for",
+            r"what (?:is|are|is are) the side effects of",
             r"what (?:is|are|is are)",
             r"clinical status of",
             r"clinical trials for",
             r"overview of",
             r"summary of",
+            r"side effects of",
+            r"side effect of",
             r"information on",
             r"tell me about",
             r"research for",
@@ -92,9 +95,7 @@ class AskEngine:
         q = re.sub(r"^(?:the|of|a|an)\s+", "", q)
         return q.strip("? ").strip()
 
-    async def ask(
-        self, query: str
-    ) -> Union[DrugExplanation, ConditionSummary, ClinicalConclusion]:
+    async def ask(self, query: str) -> Union[DrugExplanation, ConditionSummary, ClinicalConclusion]:
         """Asynchronous entry point for structured clinical queries."""
         from .client import AsyncMedKit
 
@@ -125,9 +126,7 @@ class AskEngine:
                 trials=results.trials,
             )
 
-    def ask_sync(
-        self, query: str
-    ) -> Union[DrugExplanation, ConditionSummary, ClinicalConclusion]:
+    def ask_sync(self, query: str) -> Union[DrugExplanation, ConditionSummary, ClinicalConclusion]:
         """Synchronous entry point for structured clinical queries."""
         from .client import MedKit
 

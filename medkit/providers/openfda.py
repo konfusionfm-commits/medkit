@@ -24,9 +24,7 @@ class OpenFDAProvider(BaseProvider):
         """Check if OpenFDA API is reachable asynchronously."""
         async_client = cast(httpx.AsyncClient, self.client)
         try:
-            resp = await async_client.get(
-                self.base_url, params={"limit": 1}, timeout=2.0
-            )
+            resp = await async_client.get(self.base_url, params={"limit": 1}, timeout=2.0)
             return resp.status_code == 200
         except Exception:
             return False
@@ -35,9 +33,8 @@ class OpenFDAProvider(BaseProvider):
         """Check if OpenFDA API is reachable synchronously."""
         if not isinstance(self.client, httpx.Client):
             return True  # Avoid blocking if client is async
-        sync_client = cast(httpx.Client, self.client)
         try:
-            resp = sync_client.get(self.base_url, params={"limit": 1}, timeout=2.0)
+            resp = self.client.get(self.base_url, params={"limit": 1}, timeout=2.0)
             return resp.status_code == 200
         except Exception:
             return False
@@ -53,9 +50,7 @@ class OpenFDAProvider(BaseProvider):
         generic_names = openfda.get("generic_name", ["Unknown"])
 
         brand_name = brand_names[0] if isinstance(brand_names, list) else brand_names
-        generic_name = (
-            generic_names[0] if isinstance(generic_names, list) else generic_names
-        )
+        generic_name = generic_names[0] if isinstance(generic_names, list) else generic_names
 
         # Expanded interaction retrieval
         # OpenFDA label paths are inconsistent; check common ones
@@ -94,9 +89,7 @@ class OpenFDAProvider(BaseProvider):
         """Fetch drug by application number or ID synchronously."""
         sync_client = cast(httpx.Client, self.client)
         try:
-            response = sync_client.get(
-                self.base_url, params={"search": f'id:"{item_id}"'}
-            )
+            response = sync_client.get(self.base_url, params={"search": f'id:"{item_id}"'})
             response.raise_for_status()
             results = response.json().get("results", [])
             if not results:
@@ -109,9 +102,7 @@ class OpenFDAProvider(BaseProvider):
         """Fetch drug by application number or ID asynchronously."""
         async_client = cast(httpx.AsyncClient, self.client)
         try:
-            response = await async_client.get(
-                self.base_url, params={"search": f'id:"{item_id}"'}
-            )
+            response = await async_client.get(self.base_url, params={"search": f'id:"{item_id}"'})
             response.raise_for_status()
             results = response.json().get("results", [])
             if not results:
@@ -123,16 +114,12 @@ class OpenFDAProvider(BaseProvider):
     def search_sync(self, query: str, **kwargs: Any) -> List[DrugInfo]:
         """Search for drugs synchronously."""
         limit = kwargs.get("limit", 1)
-        sync_client = cast(httpx.Client, self.client)
         try:
             # Enhanced search query to catch more generic/brand overlaps
-            search_query = (
-                f'openfda.brand_name:"{query}" openfda.generic_name:"{query}"'
+            search_query = f'openfda.brand_name:"{query}" openfda.generic_name:"{query}"'
+            response = self._sync_request(
+                "GET", self.base_url, params={"search": search_query, "limit": limit}
             )
-            response = sync_client.get(
-                self.base_url, params={"search": search_query, "limit": limit}
-            )
-            response.raise_for_status()
             results = response.json().get("results", [])
             return [self._parse_drug(r) for r in results]
         except Exception:
@@ -141,15 +128,11 @@ class OpenFDAProvider(BaseProvider):
     async def search(self, query: str, **kwargs: Any) -> List[DrugInfo]:
         """Search for drugs asynchronously."""
         limit = kwargs.get("limit", 1)
-        async_client = cast(httpx.AsyncClient, self.client)
         try:
-            search_query = (
-                f'openfda.brand_name:"{query}" openfda.generic_name:"{query}"'
+            search_query = f'openfda.brand_name:"{query}" openfda.generic_name:"{query}"'
+            response = await self._async_request(
+                "GET", self.base_url, params={"search": search_query, "limit": limit}
             )
-            response = await async_client.get(
-                self.base_url, params={"search": search_query, "limit": limit}
-            )
-            response.raise_for_status()
             results = response.json().get("results", [])
             return [self._parse_drug(r) for r in results]
         except Exception:

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Resiliency | MedKit Docs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script src="docs.js" defer></script>
+</head>
+
+<body class="doc-page">
+
+    <nav class="top-nav">
+        <a href="index.html" class="btn-back">MedKit</a>
+        <div class="nav-title">Documentation</div>
+    </nav>
+
+    <main class="doc-content">
+        <h1 class="gradient-text">Resiliency</h1>
+        <p class="subtitle">Keep your app running smoothly with circuit breakers and retries.</p>
+
+        <section class="doc-section">
+            <h2>1. Handling API Blocks</h2>
+            <p>One great thing about MedKit is that it deals with random API blocks for you.</p>
+            <p>For example, if ClinicalTrials.gov blocks your request with a 403 error, MedKit will catch it and try
+                again using a local curl command behind the scenes. Your app won't even notice the hiccup.</p>
+            <pre><code class="language-python"># Inside MedKit's ClinicalTrialsProvider.py
+try:
+    response = await client.get("https://clinicaltrials.gov/api/v2/studies")
+    response.raise_for_status()
+    # ...
+except httpx.HTTPStatusError as e:
+    if e.response.status_code == 403:
+        # Transparent fallback to cURL spawned as a subprocess
+        logger.warning("403 Forbidden. Using curl fallback mechanism.")
+        output = await asyncio.create_subprocess_shell("curl -s ...")
+        return json.loads(stdout)</code></pre>
+        </section>
+
+        <section class="doc-section">
+            <h2>2. Circuit Breakers</h2>
+            <p>To prevent your app from crashing if PubMed goes down, MedKit uses a Circuit Breaker.</p>
+            <pre><code class="language-python">from medkit.resiliency import CircuitBreaker
+
+# Example Architecture Context
+cb = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
+
+# If PubMed fails 5 times consecutively, the SDK circuit trips OPEN.
+# Subsequent query attempts will immediately raise `CircuitOpenError` natively via Python 
+# rather than waiting 15 seconds repeatedly for an HTTP network timeout payload.</code></pre>
+            <p>This ensures your application's threads aren't locked up waiting on unresponsive servers.</p>
+        </section>
+
+        <section class="doc-section">
+            <h2>3. Exponential Jitter Retries</h2>
+            <p>You can configure exactly how MedKit retries failed requests. You can determine exactly how many times
+                the client attempts to recover a dropped payload, how long to wait between attempts, and whether to
+                algorithmically use random Jitter delays.</p>
+            <p>Using Jitter ensures that if 1,000 servers simultaneously experience a PubMed timeout, they randomly
+                stagger their retry attempts, eliminating denial-of-service scenarios against FDA infrastructure.</p>
+            <pre><code class="language-python">from medkit import MedKitConfig
+
+# Override the defaults
+config = MedKitConfig(
+    MEDKIT_RETRY_MAX=3,
+    MEDKIT_RETRY_DELAY=2.0,
+    MEDKIT_RETRY_JITTER=True # Injects random milliseconds into backoff
+)
+
+# MedKit handles the 429 Too Many Requests seamlessly
+async with AsyncMedKit(config=config) as med:
+    ...</code></pre>
+        </section>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 4rem;">
+            <a href="docs_interactions.html" class="btn btn-github">← Previous</a>
+        </div>
+    </main>
+
+</body>
+
+</html>

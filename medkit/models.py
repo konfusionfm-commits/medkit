@@ -25,16 +25,10 @@ class DrugInfo(BaseModel):
     brand_name: str = Field(..., description="Brand name of the drug.")
     generic_name: str = Field(..., description="Generic name of the drug.")
     manufacturer: Optional[str] = Field(None, description="Manufacturer of the drug.")
-    indications: List[str] = Field(
-        default_factory=list, description="Indications for the drug."
-    )
-    interactions: List[str] = Field(
-        default_factory=list, description="Known drug interactions."
-    )
+    indications: List[str] = Field(default_factory=list, description="Indications for the drug.")
+    interactions: List[str] = Field(default_factory=list, description="Known drug interactions.")
     dosage_form: Optional[str] = Field(None, description="Dosage form of the drug.")
-    route: List[str] = Field(
-        default_factory=list, description="Route of administration."
-    )
+    route: List[str] = Field(default_factory=list, description="Route of administration.")
 
 
 class ResearchPaper(BaseModel):
@@ -59,18 +53,12 @@ class ClinicalTrial(BaseModel):
     nct_id: str = Field(..., description="ClinicalTrials.gov Identifier.")
     title: Optional[str] = Field(None, description="Title of the clinical trial.")
     status: Optional[str] = Field(None, description="Recruitment status.")
-    conditions: List[str] = Field(
-        default_factory=list, description="Conditions studied."
-    )
+    conditions: List[str] = Field(default_factory=list, description="Conditions studied.")
     description: Optional[str] = Field(None, description="Description of the trial.")
-    recruiting: bool = Field(
-        False, description="Whether the trial is currently recruiting."
-    )
+    recruiting: bool = Field(False, description="Whether the trial is currently recruiting.")
     url: Optional[str] = Field(None, description="URL to the clinical trial.")
     phase: List[str] = Field(default_factory=list, description="Phases of the trial.")
-    location: List[str] = Field(
-        default_factory=list, description="Locations of the trial."
-    )
+    location: List[str] = Field(default_factory=list, description="Locations of the trial.")
     eligibility: Optional[str] = Field(None, description="Eligibility criteria.")
     interventions: List[str] = Field(
         default_factory=list, description="Drugs or therapies studied."
@@ -84,9 +72,7 @@ class ClinicalTrial(BaseModel):
 class SearchResults(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    drugs: List[DrugInfo] = Field(
-        default_factory=list, description="Drugs matching the query."
-    )
+    drugs: List[DrugInfo] = Field(default_factory=list, description="Drugs matching the query.")
     papers: List[ResearchPaper] = Field(
         default_factory=list, description="Research papers matching the query."
     )
@@ -99,24 +85,16 @@ class SearchResults(BaseModel):
 class DrugExplanation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    drug_info: Optional[DrugInfo] = Field(
-        None, description="FDA information about the drug."
-    )
-    papers: List[ResearchPaper] = Field(
-        default_factory=list, description="Recent research papers."
-    )
-    trials: List[ClinicalTrial] = Field(
-        default_factory=list, description="Active clinical trials."
-    )
+    drug_info: Optional[DrugInfo] = Field(None, description="FDA information about the drug.")
+    papers: List[ResearchPaper] = Field(default_factory=list, description="Recent research papers.")
+    trials: List[ClinicalTrial] = Field(default_factory=list, description="Active clinical trials.")
 
 
 class ConditionSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     condition: str = Field(..., description="The medical condition or term.")
-    drugs: List[str] = Field(
-        default_factory=list, description="Commonly associated drug names."
-    )
+    drugs: List[str] = Field(default_factory=list, description="Commonly associated drug names.")
     papers: List[ResearchPaper] = Field(
         default_factory=list, description="Recent research highlights."
     )

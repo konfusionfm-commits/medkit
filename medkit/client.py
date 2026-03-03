@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import abc
+import asyncio
 import os
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Union, cast
 
 import httpx
 
+if TYPE_CHECKING:
+    from .config import MedKitConfig
+
+
 from .ask_engine import AskEngine
-from .cache import DiskCache, MemoryCache
+from .cache_backends import DiskCache, MemoryCache
 from .exceptions import APIError, MedKitError, PluginError, RateLimitError
 from .graph import MedicalGraph
 from .intelligence import IntelligenceEngine
@@ -51,7 +56,7 @@ class BaseMedKit(abc.ABC):
         """Register a new data provider."""
         if not hasattr(provider, "name") or not provider.name:
             raise PluginError("Provider must have a non-empty 'name' attribute.")
-        self._providers[cast(str, provider.name)] = provider
+        self._providers[provider.name] = provider
 
     def _handle_provider_error(self, provider_name: str, error: Exception) -> None:
         """Unified error handler for provider failures."""
@@ -61,9 +66,7 @@ class BaseMedKit(abc.ABC):
             elif isinstance(error, httpx.HTTPStatusError):
                 if error.response.status_code == 429:
                     raise RateLimitError(f"Rate limit exceeded for {provider_name}")
-                raise APIError(
-                    f"{provider_name} API returned {error.response.status_code}"
-                )
+                raise APIError(f"{provider_name} API returned {error.response.status_code}")
         raise error
 
     def _get_provider(self, name: str) -> Provider:
@@ -76,12 +79,38 @@ class BaseMedKit(abc.ABC):
 class AsyncMedKit(BaseMedKit):
     """Asynchronous unified medical developer platform."""
 
-    def __init__(
-        self, timeout: float = 10.0, max_connections: int = 100, debug: bool = False
-    ):
+    def __init__(self, config: MedKitConfig | None = None, debug: bool = False):
         super().__init__(debug=debug)
+        from .config import MedKitConfig
+
+        self.config = config or MedKitConfig()
+
+        limits = httpx.Limits(
+            max_connections=self.config.max_connections,
+            max_keepalive_connections=self.config.max_keepalive_connections,
+            keepalive_expiry=self.config.keepalive_expiry,
+        )
+
+        # Determine global client settings
+        client_kwargs = {
+            "timeout": self.config.timeout,
+            "limits": limits,
+            "http2": self.config.http2,
+        }
+
+        # Avoid passing `trust_env` or `verify` unless explicitly configured later,
+        # but configure base properties
+
+        # Use a modern browser User-Agent to avoid API blocks
+        default_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+
         self._http_client = httpx.AsyncClient(
-            timeout=timeout, limits=httpx.Limits(max_connections=max_connections)
+            timeout=client_kwargs["timeout"],  # type: ignore
+            limits=client_kwargs["limits"],  # type: ignore
+            http2=client_kwargs["http2"],  # type: ignore
+            headers=default_headers,
         )
         self._pubmed_limiter = AsyncRateLimiter(3, 1.0)
         self._fda_limiter = AsyncRateLimiter(5, 1.0)
@@ -90,11 +119,15 @@ class AsyncMedKit(BaseMedKit):
         # Built-in providers
         self.register_provider(OpenFDAProvider(self._http_client))
         self.register_provider(PubMedProvider(self._http_client))
-        # Forced HTTP/1.1 client for ClinicalTrials often helps with gov API blocks
+
+        # ClinicalTrials specific overrides (e.g. forced HTTP/1.1)
+        ct_headers = default_headers.copy()
+        ct_headers["Connection"] = "close"
         self._ct_client = httpx.AsyncClient(
-            timeout=timeout,
-            http2=False,  # Disable HTTP/2
-            headers={"Connection": "close"},  # Avoid some keep-alive fingerprinting
+            timeout=client_kwargs["timeout"],  # type: ignore
+            limits=client_kwargs["limits"],  # type: ignore
+            http2=False,
+            headers=ct_headers,
         )
         self.register_provider(ClinicalTrialsProvider(self._ct_client))
 
@@ -109,11 +142,9 @@ class AsyncMedKit(BaseMedKit):
         """Unified search across all registered providers."""
         start_time = time.perf_counter()
 
-        import asyncio
-
         offline_providers = []
 
-        async def _safe_search(name: str, limiter: AsyncRateLimiter):
+        async def _safe_search(name: str, limiter: AsyncRateLimiter) -> Any:
             await limiter.wait()
             try:
                 prov = self._get_provider(name)
@@ -133,9 +164,7 @@ class AsyncMedKit(BaseMedKit):
         pubmed_task = _safe_search("pubmed", self._pubmed_limiter)
         trials_task = _safe_search("clinicaltrials", self._trials_limiter)
 
-        fda_res, pubmed_res, trials_res = await asyncio.gather(
-            fda_task, pubmed_task, trials_task
-        )
+        fda_res, pubmed_res, trials_res = await asyncio.gather(fda_task, pubmed_task, trials_task)
 
         metadata = SearchMetadata(
             query_time=time.perf_counter() - start_time,
@@ -145,11 +174,7 @@ class AsyncMedKit(BaseMedKit):
         )
 
         return SearchResults(
-            drugs=fda_res
-            if isinstance(fda_res, list)
-            else [fda_res]
-            if fda_res
-            else [],
+            drugs=fda_res if isinstance(fda_res, list) else [fda_res] if fda_res else [],
             papers=pubmed_res
             if isinstance(pubmed_res, list)
             else [pubmed_res]
@@ -163,9 +188,7 @@ class AsyncMedKit(BaseMedKit):
             metadata=metadata,
         )
 
-    async def ask(
-        self, query: str
-    ) -> Union[DrugExplanation, ConditionSummary, ClinicalConclusion]:
+    async def ask(self, query: str) -> Union[DrugExplanation, ConditionSummary, ClinicalConclusion]:
         """High-level clinical question answering."""
         engine = AskEngine(self)
         return await engine.ask(query)
@@ -175,21 +198,32 @@ class AsyncMedKit(BaseMedKit):
         results = await self.search(query)
         graph = MedicalGraph()
 
+        # Add explicit FDA drugs as nodes
         for drug in results.drugs:
             graph.add_node(drug.brand_name, drug.brand_name, "drug")
 
+        # Add Research Papers
         for paper in results.papers:
-            graph.add_node(paper.pmid, paper.title, "paper")
+            graph.add_node(paper.pmid, paper.title[:50] + "...", "paper")
 
+        # Track which interventions we've already added as generic drug nodes
+        known_interventions = {d.brand_name.lower() for d in results.drugs}
+
+        # Add Clinical Trials and map their interventions
         for trial in results.trials:
-            graph.add_node(trial.nct_id, trial.title or trial.nct_id, "trial")
+            graph.add_node(trial.nct_id, trial.title[:50] + "...", "trial")
+            
             if trial.interventions:
-                for drug in results.drugs:
-                    if any(
-                        drug.brand_name.lower() in i.lower()
-                        for i in trial.interventions
-                    ):
-                        graph.add_edge(drug.brand_name, trial.nct_id, "intervenes")
+                for intervention in trial.interventions:
+                    clean_name = intervention.split(" ")[0] # Grab primary drug name
+                    
+                    # If this intervention wasn't in the FDA drug list, add it as a new node
+                    if clean_name.lower() not in known_interventions and len(clean_name) > 3:
+                        graph.add_node(clean_name, clean_name.title(), "drug")
+                        known_interventions.add(clean_name.lower())
+                    
+                    # Link the drug to the trial
+                    graph.add_edge(clean_name, trial.nct_id, "intervenes")
 
         return graph
 
@@ -202,22 +236,50 @@ class AsyncMedKit(BaseMedKit):
 class MedKit(BaseMedKit):
     """Synchronous unified medical developer platform."""
 
-    def __init__(self, timeout: float = 10.0, debug: bool = False):
+    def __init__(self, config: MedKitConfig | None = None, debug: bool = False):
         super().__init__(debug=debug)
-        self._http_client = httpx.Client(timeout=timeout)
+        from .config import MedKitConfig
+
+        self.config = config or MedKitConfig()
+
+        limits = httpx.Limits(
+            max_connections=self.config.max_connections,
+            max_keepalive_connections=self.config.max_keepalive_connections,
+            keepalive_expiry=self.config.keepalive_expiry,
+        )
+
+        # Use a modern browser User-Agent to avoid API blocks
+        default_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+
+        self._http_client = httpx.Client(
+            timeout=self.config.timeout,
+            limits=limits,
+            http2=self.config.http2,
+            headers=default_headers,
+        )
         self._pubmed_limiter = RateLimiter(3, 1.0)
         self._fda_limiter = RateLimiter(5, 1.0)
         self._trials_limiter = RateLimiter(5, 1.0)
 
         self.register_provider(OpenFDAProvider(self._http_client))
         self.register_provider(PubMedProvider(self._http_client))
-        self.register_provider(ClinicalTrialsProvider(self._http_client))
+
+        # ClinicalTrials specific overrides (e.g. forced HTTP/1.1)
+        ct_headers = default_headers.copy()
+        ct_headers["Connection"] = "close"
+        self._ct_client = httpx.Client(
+            timeout=self.config.timeout, limits=limits, http2=False, headers=ct_headers
+        )
+        self.register_provider(ClinicalTrialsProvider(self._ct_client))
 
     def __enter__(self) -> MedKit:
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self._http_client.close()
+        self._ct_client.close()
 
     def search(self, query: str) -> SearchResults:
         """Unified search across all registered providers."""
@@ -225,7 +287,7 @@ class MedKit(BaseMedKit):
 
         offline_providers = []
 
-        def _safe_call(name: str):
+        def _safe_call(name: str) -> Any:
             try:
                 prov = self._get_provider(name)
                 if not prov.health_check():
@@ -251,11 +313,7 @@ class MedKit(BaseMedKit):
         )
 
         return SearchResults(
-            drugs=fda_res
-            if isinstance(fda_res, list)
-            else [fda_res]
-            if fda_res
-            else [],
+            drugs=fda_res if isinstance(fda_res, list) else [fda_res] if fda_res else [],
             papers=pubmed_res
             if isinstance(pubmed_res, list)
             else [pubmed_res]
@@ -269,9 +327,7 @@ class MedKit(BaseMedKit):
             metadata=metadata,
         )
 
-    def ask(
-        self, query: str
-    ) -> Union[DrugExplanation, ConditionSummary, ClinicalConclusion]:
+    def ask(self, query: str) -> Union[DrugExplanation, ConditionSummary, ClinicalConclusion]:
         engine = AskEngine(self)
         return engine.ask_sync(query)
 
@@ -279,16 +335,21 @@ class MedKit(BaseMedKit):
         results = self._get_provider("openfda").search_sync(name)
         if not results:
             raise MedKitError(f"Drug '{name}' not found.")
-        return results[0]
+        return cast(DrugInfo, results[0])
 
     def papers(self, query: str, limit: int = 10) -> List[ResearchPaper]:
-        return self._get_provider("pubmed").search_sync(query, limit=limit)
+        return cast(
+            List[ResearchPaper], self._get_provider("pubmed").search_sync(query, limit=limit)
+        )
 
     def trials(
         self, condition: str, limit: int = 10, recruiting: bool = False
     ) -> List[ClinicalTrial]:
-        return self._get_provider("clinicaltrials").search_sync(
-            condition, limit=limit, recruiting=recruiting
+        return cast(
+            List[ClinicalTrial],
+            self._get_provider("clinicaltrials").search_sync(
+                condition, limit=limit, recruiting=recruiting
+            ),
         )
 
     def interactions(self, drugs: List[str]) -> List[Dict[str, Any]]:
@@ -299,6 +360,4 @@ class MedKit(BaseMedKit):
     def conclude(self, query: str) -> ClinicalConclusion:
         results = self.search(query)
         intelligence = IntelligenceEngine()
-        return intelligence.synthesize(
-            query, results.drugs, results.papers, results.trials
-        )
+        return intelligence.synthesize(query, results.drugs, results.papers, results.trials)

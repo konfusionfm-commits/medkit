@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drug Interactions & Real-World Safety | MedKit Docs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="docs.css">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script src="docs.js" defer></script>
+</head>
+
+<body class="doc-page">
+
+    <nav class="top-nav">
+        <a href="index.html" class="btn-back">MedKit</a>
+        <div class="nav-title">Documentation</div>
+    </nav>
+
+    <main class="doc-content">
+        <h1 class="gradient-text">Drug Interactions</h1>
+        <p class="subtitle">Check drugs against OpenFDA warning labels easily.</p>
+
+        <section class="doc-section">
+            <h2>1. Checking Interactions</h2>
+            <p>MedKit automatically checks drugs against the FDA's database for adverse events. You can use this to show
+                interaction alerts directly to your users before they prescribe anything.</p>
+            <pre><code class="language-python">import asyncio
+from medkit import AsyncMedKit
+
+async def main():
+    async with AsyncMedKit() as med:
+        # Cross-reference an arbitrary number of compounds
+        drug_list = ["Aspirin", "Warfarin", "Ibuprofen"]
+        
+        # Resolves to a List of Dictionaries containing the drugs compared and their warning
+        warnings = await med.interactions(drug_list)
+        
+        for w in warnings:
+            # Pydantic model with .severity, .risk, and .evidence
+            warning_obj = w["warning"]
+            drugs_checked = " + ".join(w["drugs"])
+            
+            print(f"[{warning_obj.severity.upper()}] {drugs_checked}")
+            print(f"Message: {warning_obj.risk}")
+            print(f"FDA Evidence Link: {warning_obj.evidence}\n")
+
+if __name__ == "__main__":
+    asyncio.run(main())</code></pre>
+        </section>
+
+        <section class="doc-section">
+            <h2>2. CLI Usage Example</h2>
+            <p>You can instantly check a prescription cocktail directly from the terminal:</p>
+            <pre><code class="language-bash">$ medkit interactions "Aspirin, Warfarin"
+
+                          Drug-Drug Interactions                           
+┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Drugs              ┃ Severity ┃ Risk                                    ┃
+┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Aspirin + Warfarin │ High     │ Increased risk of bleeding events, in…  │
+└────────────────────┴──────────┴─────────────────────────────────────────┘</code></pre>
+        </section>
+
+        <section class="doc-section">
+            <h2>3. Under The Hood: The Engine</h2>
+            <p>When you check interactions, the engine does a few things behind the scenes:</p>
+            <ul>
+                <li>It sequentially forms permutations of the target list (A+B, A+C, B+C).</li>
+                <li>Fires off highly parallelized async sub-queries using <code>httpx</code>.</li>
+                <li>Checks for the presence of your drugs within the explicitly defined <code>drug_interactions</code>
+                    and <code>boxed_warnings</code> JSON fields of the FDA Label database.</li>
+            </ul>
+        </section>
+
+        <section class="doc-section">
+            <h2>4. Severity Thresholds Formulation</h2>
+            <p>MedKit categorizes interaction warnings into three levels based on the exact words the FDA uses:</p>
+            <ul>
+                <li><strong style="color:#ef4444">SEVERE:</strong> Matches "contraindicated", "fatal",
+                    "life-threatening", "black box".</li>
+                <li><strong style="color:#f59e0b">MODERATE:</strong> Matches "caution", "avoid", "monitor", "dose
+                    adjustment".</li>
+                <li><strong style="color:#10b981">MILD:</strong> Any standard interaction tables remaining.</li>
+            </ul>
+        </section>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 4rem;">
+            <a href="docs_intelligence.html" class="btn btn-github">← Previous</a>
+            <a href="docs_resiliency.html" class="btn btn-github">Next: Enterprise Resiliency →</a>
+        </div>
+    </main>
+
+</body>
+
+</html>
