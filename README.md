@@ -154,13 +154,23 @@ Nodes: 26 | Edges: 8
     └── Therapeutic strategies for eld...
 ```
 
+## 🤝 Contributing
+
+We welcome contributions! As an open-source project, community feedback and improvements can be the backbone of thi.
+
+1. **Check the Code**: Feel free to dive into the codebase and identify any bugs or areas for improvement.
+2. **Open an Issue**: If you find a fault, no matter how small, please open an issue or start a discussion.
+3. **Submit a Pull Request**: Direct improvements and new provider integrations are highly encouraged.
+
+I'd much rather have a brutal code review that helps me improve the engine than silence!
+
 ---
 
 ## 🗺️ Roadmap
 
 - [x] **v1.0.0**: Foundation medical mesh and provider integration.
 - [x] **v2.0.0**: Async architecture, v2 API support.
-- [x] **v3.0.0**: Enterprise readiness (Circuit Breakers, Retries, Coverage, Pydantic V2, CLI UI).
+- [x] **v3.0.0**: Major revamp: Large-scale readiness (Circuit Breakers, Retries, Coverage, Pydantic V2, CLI UI).
 - [ ] **v4.0.0**: Local GraphQL medical mesh endpoint.
 
 ---
