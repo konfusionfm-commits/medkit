@@ -51,6 +51,7 @@ asyncio.run(main())
 | **Speed** | Sequential network calls | **Parallel** Async Orchestration |
 
 ---
+Note: This is still a Work in Progress, meaning there might be missing functionaliy, placeholders, etc. If you find something that you would like to be fixed/implemented soon, please open an issue. Also, this SDK is not FDA-Approved, and has no official medical licensing. Use at your own discretion!
 
 ## 🏗️ Architecture
 
