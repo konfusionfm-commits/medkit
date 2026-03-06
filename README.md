@@ -155,9 +155,19 @@ Nodes: 26 | Edges: 8
     └── Therapeutic strategies for eld...
 ```
 
+## ⚖️ Attributions & Disclaimers
+
+MedKit uses data from public APIs but is not endorsed or certified by any of the governing bodies:
+
+* **ClinicalTrials.gov**: MedKit uses data from ClinicalTrials.gov but is not endorsed by ClinicalTrials.gov or the U.S. National Library of Medicine.
+* **OpenFDA**: MedKit uses data from openFDA but is not endorsed by the U.S. Food and Drug Administration.
+* **PubMed**: MedKit uses data from PubMed but is not endorsed by the U.S. National Library of Medicine.
+
+---
+
 ## 🤝 Contributing
 
-We welcome contributions! As an open-source project, community feedback and improvements can be the backbone of thi.
+We welcome contributions! As an open-source project, community feedback and improvements can be the backbone of Medkit.
 
 1. **Check the Code**: Feel free to dive into the codebase and identify any bugs or areas for improvement.
 2. **Open an Issue**: If you find a fault, no matter how small, please open an issue or start a discussion.
